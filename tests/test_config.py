@@ -28,7 +28,7 @@ def _edit(text: str, fn) -> str:
 # ── Configuração ───────────────────────────────────────────────────────
 
 def test_examples_are_valid():
-    actor = parse_config(ACTOR, "prd")
+    actor = parse_config(ACTOR, "prd", raw_bucket="s3://datalake-{env}-raw")
     assert actor.key == "sakila.actor"
     assert actor.source_type == "postgres"
     assert actor.server.secret_id.endswith("prd/sakila/postgres")
@@ -45,7 +45,10 @@ def test_examples_are_valid():
 
 
 def test_env_selects_server_and_resolves_placeholder():
-    assert parse_config(ACTOR, "dev").target.path == "s3://datalake-dev-raw/sakila/actor/"
+    assert parse_config(ACTOR, "dev", raw_bucket="s3://datalake-{env}-raw/").target.path == "s3://datalake-dev-raw/sakila/actor/"
+    assert parse_config(ACTOR, "prd").target.path == ""  # sem --raw-bucket (validate-only)
+    with pytest.raises(ConfigError, match="raw-bucket"):
+        parse_config(ACTOR, "prd", raw_bucket="datalake-raw")
     with pytest.raises(ConfigError, match="ambiente 'hml'"):
         parse_config(ACTOR, "hml")
 

@@ -51,7 +51,6 @@ columns:
   physicalType: timestamp
   required: true
 target:
-  path: s3://datalake-{env}-raw/sakila/actor/
   database: raw_sakila
   table: actor
   partitionColumn: dt_ingestao

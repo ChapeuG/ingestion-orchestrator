@@ -110,6 +110,8 @@ def run_table(spark: SparkSession, config: IngestionConfig, params: RunParams) -
     result = TableResult(config.key)
     started = time.monotonic()
     try:
+        if not config.target.path:
+            raise ValueError("destino na raw indefinido: informe --raw-bucket")
         connector = get_connector(config.source_type)
         jdbc = connector.jdbc_options(config.server, get_secret(config.server.secret_id))
         secret_key = (get_secret_field(config.encryption.secret_arn, config.encryption.secret_field)

@@ -65,7 +65,8 @@ O CI roda o lint em todo PR que mexe em `contracts/`.
 | `properties[].customProperties.encrypt: true` | AES/ECB + base64 antes de gravar (chave em `cryptographySecretArn`) |
 | `quality` (`nullValues`, `duplicateValues`, `rowCount`) | Checagens antes de gravar: `error` bloqueia, `warning` registra |
 | `customProperties.rawPartitionColumn` | **Obrigatório.** Coluna de partição da raw (`<coluna>=yyyyMMdd`) e do Athena |
-| `customProperties.rawPath` / `rawDatabase` | Destino na raw e no Athena (`{env}` vira dev/hml/prd) |
+| `customProperties.rawDatabase` | Database no Glue/Athena (default `raw_<dataset>`) |
+| — | Destino na raw: sempre `<--raw-bucket>/<dataset>/<tabela>/` |
 | `primaryKey`, `stagingName`, `description` | Usados pelo framework na transformação (merge Delta, nomenclatura, comments) |
 
 Senha e chave **nunca** entram no contrato: só o ARN da secret.
@@ -100,13 +101,15 @@ spark-submit \
   --packages org.postgresql:postgresql:42.7.4,com.oracle.database.jdbc:ojdbc8:21.9.0.0 \
   s3://<bucket-artefatos>/ingestion-orchestrator/main.py \
   --config s3://<bucket>/ingestion-config/sakila/actor.ingestion.yml \
-  --env prd
+  --env prd \
+  --raw-bucket s3://datalake-{env}-raw
 ```
 
 | Parâmetro | Default | Função |
 |---|---|---|
 | `--config` | — | Um `ingestion.yml` ou um prefixo (roda todos os `*.ingestion.yml` abaixo dele) |
 | `--env` | — | Escolhe o servidor do contrato e resolve `{env}` |
+| `--raw-bucket` | `$DL_RAW_BUCKET` | Bucket da raw; o destino é `<bucket>/<dataset>/<tabela>/` (`{env}` vira o ambiente) |
 | `--start-date` / `--end-date` | D-1 | Reprocessamento (`yyyy-MM-dd`) |
 | `--ingestion-type` | `normal` | `historical` filtra só pela coluna `partitioned` |
 | `--tables` | todas | Filtra por `tabela` ou `dataset.tabela` |

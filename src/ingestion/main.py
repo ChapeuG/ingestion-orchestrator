@@ -1,7 +1,8 @@
 """Ponto de entrada do orquestrador.
 
     spark-submit --py-files ingestion.zip --packages <drivers> jobs/main.py \\
-        --config s3://<bucket>/ingestion-config/sakila/actor.ingestion.yml --env prd
+        --config s3://<bucket>/ingestion-config/sakila/actor.ingestion.yml --env prd \\
+        --raw-bucket s3://datalake-{env}-raw
 
 --config aceita um arquivo ou um prefixo (todas as tabelas *.ingestion.yml abaixo dele).
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 
 from ingestion import dates
@@ -28,17 +30,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--end-date", default="", help="yyyy-MM-dd. Vazio = start-date (ou D-1)")
     p.add_argument("--ingestion-type", default=dates.NORMAL, choices=[dates.NORMAL, dates.HISTORICAL])
     p.add_argument("--tables", default="", help="Filtra tabelas: tabela ou dataset.tabela, separadas por vírgula")
+    p.add_argument("--raw-bucket", default=os.environ.get("DL_RAW_BUCKET", ""),
+                   help="Bucket da raw (ex: s3://datalake-{env}-raw). Destino = <bucket>/<dataset>/<tabela>/. "
+                        "Default: $DL_RAW_BUCKET. Obrigatório, exceto com --validate-only")
     p.add_argument("--validate-only", action="store_true", help="Só valida os yml (não abre Spark nem conexões)")
     return p
 
 
-def load_configs(uri: str, env: str, tables: str = "") -> list[IngestionConfig]:
+def load_configs(uri: str, env: str, tables: str = "", raw_bucket: str = "") -> list[IngestionConfig]:
     """Lê e valida todos os yml antes de começar (um yml inválido não deixa carga pela metade)."""
     wanted = {t.strip().lower() for t in tables.split(",") if t.strip()}
     configs, errors = [], []
     for path in list_configs(uri):
         try:
-            cfg = parse_config(read_text(path), env, origin=path)
+            cfg = parse_config(read_text(path), env, origin=path, raw_bucket=raw_bucket)
         except ConfigError as e:
             errors.append(str(e))
             continue
@@ -55,8 +60,11 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
     args = build_parser().parse_args(argv)
 
+    if not args.raw_bucket and not args.validate_only:
+        log.error("Informe --raw-bucket (ou $DL_RAW_BUCKET): o destino é <bucket>/<dataset>/<tabela>/")
+        return 2
     try:
-        configs = load_configs(args.config, args.env, args.tables)
+        configs = load_configs(args.config, args.env, args.tables, args.raw_bucket)
     except (ConfigError, FileNotFoundError) as e:
         log.error("Configuração inválida:\n%s", e)
         return 2

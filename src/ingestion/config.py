@@ -110,7 +110,15 @@ def _find_placeholders(node, path="") -> list[str]:
     return [path] if isinstance(node, str) and PLACEHOLDER in node else []
 
 
-def parse_config(text: str, env: str, origin: str = "ingestion.yml") -> IngestionConfig:
+def raw_path(raw_bucket: str, dataset: str, table: str, env: str) -> str:
+    """Destino na raw: sempre <raw-bucket>/<dataset>/<tabela>/ ({env} no bucket vira o ambiente)."""
+    bucket = _env(raw_bucket, env).rstrip("/")
+    if not bucket.startswith(("s3://", "s3a://", "file:")):
+        raise ConfigError(f"--raw-bucket precisa ser uma URI (ex: s3://datalake-{{env}}-raw), recebido: {raw_bucket}")
+    return f"{bucket}/{dataset}/{table}/"
+
+
+def parse_config(text: str, env: str, origin: str = "ingestion.yml", raw_bucket: str = "") -> IngestionConfig:
     """Converte o yml em IngestionConfig, validando tudo antes de abrir qualquer conexão."""
     from ingestion.connectors import CONNECTORS  # evita import circular
 
@@ -206,13 +214,14 @@ def parse_config(text: str, env: str, origin: str = "ingestion.yml") -> Ingestio
         raise ConfigError(f"{origin}: target.partitionColumn '{partition_column}' conflita com uma coluna da origem")
 
     parallel = load.get("parallel") or {}
-    path = _env(_require(target, "path", f"{origin}.target"), env)
-    if not path.endswith("/"):
-        path += "/"
+    dataset = str(_require(raw, "dataset", origin))
+    table = str(_require(raw, "table", origin))
+    # Sem --raw-bucket (ex: --validate-only) o caminho fica vazio e a execução recusa
+    path = raw_path(raw_bucket, dataset, table, env) if raw_bucket else ""
 
     return IngestionConfig(
-        dataset=str(_require(raw, "dataset", origin)),
-        table=str(_require(raw, "table", origin)),
+        dataset=dataset,
+        table=table,
         contract_id=str((raw.get("contract") or {}).get("id", "")),
         contract_version=str((raw.get("contract") or {}).get("version", "")),
         source_type=source_type,

@@ -49,7 +49,6 @@ columns:
   type: timestamp
   physicalType: DATE
 target:
-  path: s3://datalake-{env}-raw/cartoes/cliente/
   database: raw_cartoes
   table: cliente
   partitionColumn: dt_ingestao

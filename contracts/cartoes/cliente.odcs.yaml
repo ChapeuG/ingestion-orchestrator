@@ -44,8 +44,6 @@ schema:
         value: 4
       - property: rawPartitionColumn
         value: dt_ingestao
-      - property: rawPath
-        value: s3://datalake-{env}-raw/cartoes/cliente/
       - property: cryptographySecretArn
         value: arn:aws:secretsmanager:sa-east-1:222222222222:secret:prd/cartoes/chave-criptografia
     properties:

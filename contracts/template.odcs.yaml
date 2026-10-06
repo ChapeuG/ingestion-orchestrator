@@ -93,8 +93,7 @@ schema:
         value: 1
       - property: numDaysParallel      # [EXT] dias processados em paralelo no reprocessamento. Default 1
         value: 1
-      - property: rawPath              # [EXT] destino na raw; {env} é trocado por dev/hml/prd
-        value: s3://<bucket>-{env}-raw/<dataset>/<tabela>/
+      # Destino na raw: sempre <--raw-bucket>/<dataset>/<tabela>/ (não há campo para isso)
       - property: rawDatabase          # [EXT] database no Glue/Athena. Default: raw_<dataset>
         value: raw_<dataset>
       - property: rawPartitionColumn   # [OBRIGATÓRIO][EXT] coluna de partição da raw (valor yyyyMMdd). Minúsculo, sem default

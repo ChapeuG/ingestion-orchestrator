@@ -59,8 +59,6 @@ schema:
         value: incremental
       - property: rawPartitionColumn
         value: dt_ingestao
-      - property: rawPath
-        value: s3://datalake-{env}-raw/sakila/actor/
       - property: rawDatabase
         value: raw_sakila
     properties:

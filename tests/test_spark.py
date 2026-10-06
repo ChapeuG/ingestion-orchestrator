@@ -67,7 +67,8 @@ def test_quality_error_and_warning(spark):
 
 
 def test_create_table_sql(spark):
-    cfg = parse_config((EXAMPLES / "sakila" / "actor.ingestion.yml").read_text(encoding="utf-8"), "prd")
+    cfg = parse_config((EXAMPLES / "sakila" / "actor.ingestion.yml").read_text(encoding="utf-8"), "prd",
+                       raw_bucket="s3://datalake-{env}-raw")
     schema = spark.createDataFrame([], "actor_id int, first_name string, last_update timestamp, `@version` string").schema
     sql = create_table_sql(cfg, schema)
     assert "CREATE EXTERNAL TABLE IF NOT EXISTS `raw_sakila`.`actor`" in sql
@@ -85,8 +86,7 @@ def test_run_table_end_to_end(spark, tmp_path, monkeypatch):
     from ingestion import pipeline
 
     data = yaml.safe_load((EXAMPLES / "cartoes" / "cliente.ingestion.yml").read_text(encoding="utf-8"))
-    data["target"]["path"] = (tmp_path / "raw").as_uri() + "/"
-    cfg = parse_config(yaml.safe_dump(data), "prd")
+    cfg = parse_config(yaml.safe_dump(data), "prd", raw_bucket=(tmp_path / "raw").as_uri())
 
     source = spark.sql(
         "SELECT * FROM VALUES (1, '12345678901', 'Ana', TIMESTAMP'2026-10-05 10:00:00', TIMESTAMP'2026-10-05 11:00:00') "
@@ -109,10 +109,10 @@ def test_run_table_end_to_end(spark, tmp_path, monkeypatch):
     assert result.ok, result.error
     assert sorted(queries) == ["2026-10-04", "2026-10-05"]
     assert sorted(result.partitions) == ["20261005", "20261006"]  # reprocessamento: D grava em D+1
-    files = list((tmp_path / "raw" / "dt_ingestao=20261006").glob("*.json.gz"))
+    files = list((tmp_path / "raw" / "cartoes" / "cliente" / "dt_ingestao=20261006").glob("*.json.gz"))
     assert files, "JSON gzip não foi gravado"
 
-    written = spark.read.json(str(tmp_path / "raw" / "dt_ingestao=20261006"))
+    written = spark.read.json(str(tmp_path / "raw" / "cartoes" / "cliente" / "dt_ingestao=20261006"))
     row = written.collect()[0]
     assert row.nu_cpf != "12345678901" and row.nm_cliente == "Ana"
     assert {"@timestamp", "@version"}.isdisjoint(written.columns)  # vêm da query JDBC real, não do fake
