@@ -1,0 +1,182 @@
+# =====================================================================================
+# TEMPLATE DE DATA CONTRACT — Data Lake
+# Padrão: Open Data Contract Standard (ODCS) v3.2.0 — https://bitol-io.github.io/open-data-contract-standard
+#
+# Como usar:
+#   1. Copie para contracts/<dataset>/<tabela>.odcs.yaml (ou: python scripts/novo_contrato.py <dataset> <tabela>)
+#   2. Troque tudo que estiver como <...>. Remova os blocos opcionais que não usar.
+#   3. Edite visualmente (opcional):  npx datacontract-editor contracts/<dataset>/<tabela>.odcs.yaml
+#   4. Valide:                        datacontract lint contracts/<dataset>/<tabela>.odcs.yaml
+#   5. Gere o ingestion.yml + transformação:
+#        dl-gen generate --contract contracts/<dataset>/<tabela>.odcs.yaml --publish-s3 s3://<bucket>/ingestion-config/
+#
+# Legenda:  [OBRIGATÓRIO] o framework/orquestrador falham sem o campo
+#           [EXT]         extensão própria, sempre dentro de customProperties ({property, value})
+#           sem marcação  documentação (recomendado, não afeta a geração)
+#
+# NUNCA coloque usuário, senha ou chave no contrato: só o ARN/ID da secret no Secrets Manager.
+# =====================================================================================
+
+apiVersion: v3.2.0                     # [OBRIGATÓRIO] versão do ODCS
+kind: DataContract                     # [OBRIGATÓRIO]
+id: <uuid>                             # [OBRIGATÓRIO] identificador único e estável (gere um UUID)
+name: <dataset>-<tabela>               # nome legível do contrato
+version: 1.0.0                         # [OBRIGATÓRIO] semver: mude o MAJOR quando quebrar o schema
+status: draft                          # draft | active | deprecated | retired
+domain: <area-de-negocio>              # ex: cartoes, financeiro, credenciamento
+dataProduct: <dataset>                 # [OBRIGATÓRIO] vira o dataset no framework (pacote, repositórios, raw_<dataset>)
+
+description:
+  purpose: <Para que o dado existe e quem consome>
+  usage: <Como deve ser usado>
+  limitations: <O que NÃO deve ser feito com o dado / restrições LGPD>
+
+tags: [ingestao, <dataset>]
+
+# ── Dono do dado ──────────────────────────────────────────────────────────────────────
+team:
+  name: <time-dono>
+  description: <descrição do time>
+  members:
+    - username: <usuario>
+      role: owner                      # owner | data-engineer | data-steward
+      dateIn: "2026-01-01"
+
+support:
+  - channel: <#canal-teams-ou-slack>
+    tool: teams                        # teams | slack | email
+  - channel: <lista-de-email>
+    tool: email
+    url: mailto:<email@example.com>
+
+# ── Origem (um servidor por ambiente) ─────────────────────────────────────────────────
+# type define o conector do orquestrador: postgres | oracle | mysql | sqlserver
+servers:
+  - server: <nome-origem>-dev
+    environment: dev                   # [OBRIGATÓRIO] dev | hml | prd  (selecionado por --env no orquestrador)
+    type: postgres                     # [OBRIGATÓRIO] todos os servidores do contrato precisam ter o mesmo type
+    host: <host-dev>
+    port: 5432
+    database: <database>               # oracle: use serviceName no lugar de database
+    schema: <schema>                   # usado como prefixo quando schema[].physicalName não vier qualificado
+    customProperties:
+      - property: secretId             # [OBRIGATÓRIO][EXT] secret com username/password (e opcional host/port/dbname/url)
+        value: arn:aws:secretsmanager:sa-east-1:<conta-dev>:secret:<nome>
+  - server: <nome-origem>-prd
+    environment: prd
+    type: postgres
+    host: <host-prd>
+    port: 5432
+    database: <database>
+    schema: <schema>
+    customProperties:
+      - property: secretId
+        value: arn:aws:secretsmanager:sa-east-1:<conta-prd>:secret:<nome>
+
+# ── Tabela(s) ─────────────────────────────────────────────────────────────────────────
+# Um contrato pode ter várias tabelas; o framework gera uma por vez (--table quando houver mais de uma).
+schema:
+  - name: <tabela>                     # [OBRIGATÓRIO] nome lógico (vira o nome da tabela na raw/staging)
+    physicalName: <schema.tabela>      # tabela na origem (default: name)
+    physicalType: table
+    businessName: <Nome de negócio>
+    description: <Descrição clara da tabela>   # vira o COMMENT da tabela na staging
+    dataGranularityDescription: <Uma linha por ...>
+    customProperties:
+      - property: loadMode             # [EXT] incremental (exige uma coluna partitioned) | full. Default: incremental se houver partição
+        value: incremental
+      - property: incrementalColumns   # [EXT] colunas extras no filtro incremental (OR), ex: data de atualização
+        value: [<updated_at>]
+      - property: fetchSize            # [EXT] default 150000
+        value: 150000
+      - property: numQueriesParallel   # [EXT] leitura JDBC paralela pela coluna de partição. Default 1 (desligada)
+        value: 1
+      - property: numDaysParallel      # [EXT] dias processados em paralelo no reprocessamento. Default 1
+        value: 1
+      - property: rawPath              # [EXT] destino na raw; {env} é trocado por dev/hml/prd
+        value: s3://<bucket>-{env}-raw/<dataset>/<tabela>/
+      - property: rawDatabase          # [EXT] database no Glue/Athena. Default: raw_<dataset>
+        value: raw_<dataset>
+      - property: rawPartitionColumn   # [OBRIGATÓRIO][EXT] coluna de partição da raw (valor yyyyMMdd). Minúsculo, sem default
+        value: <coluna_particao>
+      - property: cryptographySecretArn  # [EXT] obrigatório se alguma coluna tiver encrypt: true
+        value: arn:aws:secretsmanager:sa-east-1:<conta-{env}>:secret:<chave-criptografia>
+
+    properties:
+      # Chave primária → chave do MERGE no Delta (ordem por primaryKeyPosition)
+      - name: <id>                     # [OBRIGATÓRIO] nome da coluna
+        physicalName: <ID>             # nome na origem, se diferente
+        logicalType: integer           # string | integer | number | boolean | date | timestamp | time | array | object
+        physicalType: bigint           # tipo da origem: define a tipagem Spark (tabela oficial de tipagem). Recomendado
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        unique: true
+        description: <Identificador ...>   # vira o comment do ModelField
+        classification: internal       # public | internal | restricted | confidential
+        criticalDataElement: true
+        customProperties:
+          - property: stagingName      # [EXT] nome padronizado na staging. Se ausente, a nomenclatura propõe
+            value: <cd_identificador>
+
+      # Coluna de partição → filtro incremental, leitura paralela e partição L1 da transformação
+      - name: <dt_atualizacao>
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        partitioned: true
+        partitionKeyPosition: 1
+        description: <Data/hora da última atualização do registro>
+
+      # Dado sensível (LGPD) → criptografado com AES/ECB + base64 ANTES de gravar na raw
+      - name: <nu_cpf>
+        logicalType: string
+        physicalType: varchar(11)
+        required: false
+        classification: restricted
+        description: <CPF do portador>
+        customProperties:
+          - property: encrypt          # [EXT] true = criptografa na ingestão (exige cryptographySecretArn)
+            value: true
+
+      - name: <vl_limite>
+        logicalType: number
+        physicalType: numeric(12,2)
+        description: <Valor do limite em reais>
+        # Regras de qualidade por coluna, executadas pelo orquestrador antes de gravar:
+        #   nullValues mustBe 0      → notNull
+        #   duplicateValues mustBe 0 → unique
+        # severity: error (bloqueia a carga) | warning (só registra)
+        quality:
+          - metric: nullValues
+            mustBe: 0
+            severity: warning
+            description: Limite deve vir preenchido
+
+    # Regras de qualidade da tabela (rowCount: mustBeGreaterThan | mustBeGreaterOrEqualTo | mustBeLessThan | mustBeLessOrEqualTo)
+    quality:
+      - metric: rowCount
+        mustBeGreaterThan: 0
+        severity: warning
+        description: A carga diária não deve vir vazia
+
+# ── SLA (documentação; frequency orienta o agendamento) ───────────────────────────────
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+  - property: latency
+    value: 1
+    unit: d
+  - property: retention
+    value: 5
+    unit: y
+
+# ── Extensões próprias do contrato ─────────────────────────────────────────────────────────
+customProperties:
+  - property: githubOrg                # [EXT] default datalake-org
+    value: datalake-org
+  - property: codecommitTransformation # [EXT] default <dataset>-transformation
+    value: <dataset>-transformation
+
+contractCreatedTs: "2026-01-01T00:00:00+00:00"

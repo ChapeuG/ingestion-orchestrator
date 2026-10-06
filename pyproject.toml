@@ -1,0 +1,28 @@
+[project]
+name = "ingestion-orchestrator"
+version = "0.1.0"
+description = "Ingestão JDBC → raw (S3 + Glue/Athena) em PySpark, guiada por data contract ODCS"
+requires-python = ">=3.9"
+dependencies = [
+    "pyyaml>=6.0",
+    "boto3>=1.28",
+]
+
+[project.optional-dependencies]
+# pyspark já vem no EMR; local só para testes
+spark = ["pyspark>=3.3"]
+dev = ["pytest>=7.0", "pyspark>=3.3"]
+
+[project.scripts]
+dl-ingestion = "ingestion.main:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

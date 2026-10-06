@@ -1,0 +1,96 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: 0f6c3e7d-8b9a-4c21-b3d4-5e6f7a8b9c0d
+name: cartoes-cliente
+version: 1.0.0
+status: draft
+domain: cartoes
+dataProduct: cartoes
+
+description:
+  purpose: Exemplo de contrato com origem Oracle e dado sensível criptografado na ingestão.
+  usage: Exemplo de referência (nomes e servidores fictícios).
+  limitations: CPF é dado pessoal (LGPD) — nunca gravado em claro na raw.
+
+team:
+  name: engenharia-de-dados
+  members:
+    - username: dono-exemplo
+      role: owner
+      dateIn: "2026-10-06"
+
+servers:
+  - server: cartoes-prd
+    environment: prd
+    type: oracle
+    host: cartoes-prd.example.internal
+    port: 1521
+    serviceName: CARTOESPRD
+    customProperties:
+      - property: secretId
+        value: arn:aws:secretsmanager:sa-east-1:222222222222:secret:prd/cartoes/oracle
+
+schema:
+  - name: cliente
+    physicalName: CRT.TB_CLIENTE
+    physicalType: table
+    description: Cadastro de clientes portadores de cartão.
+    customProperties:
+      - property: loadMode
+        value: incremental
+      - property: incrementalColumns
+        value: [DH_ATLZ_RGST]
+      - property: numQueriesParallel
+        value: 4
+      - property: rawPartitionColumn
+        value: dt_ingestao
+      - property: rawPath
+        value: s3://datalake-{env}-raw/cartoes/cliente/
+      - property: cryptographySecretArn
+        value: arn:aws:secretsmanager:sa-east-1:222222222222:secret:prd/cartoes/chave-criptografia
+    properties:
+      - name: cd_cliente
+        physicalName: CD_CLIENTE
+        logicalType: integer
+        physicalType: NUMBER(18,0)
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        description: Código do cliente
+        customProperties:
+          - property: stagingName
+            value: cd_cliente
+      - name: nu_cpf
+        physicalName: NU_CPF
+        logicalType: string
+        physicalType: VARCHAR2(11)
+        classification: restricted
+        description: CPF do cliente
+        customProperties:
+          - property: encrypt
+            value: true
+      - name: nm_cliente
+        physicalName: NM_CLIENTE
+        logicalType: string
+        physicalType: VARCHAR2(200)
+        classification: restricted
+        description: Nome do cliente
+      - name: dh_incl_rgst
+        physicalName: DH_INCL_RGST
+        logicalType: timestamp
+        physicalType: DATE
+        required: true
+        partitioned: true
+        partitionKeyPosition: 1
+        description: Data e hora de inclusão do registro
+      - name: dh_atlz_rgst
+        physicalName: DH_ATLZ_RGST
+        logicalType: timestamp
+        physicalType: DATE
+        description: Data e hora da última atualização do registro
+        quality:
+          - metric: nullValues
+            mustBe: 0
+            severity: warning
+
+contractCreatedTs: "2026-10-06T00:00:00+00:00"

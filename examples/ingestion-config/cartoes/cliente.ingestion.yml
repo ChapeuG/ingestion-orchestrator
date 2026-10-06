@@ -1,0 +1,68 @@
+# Gerado pelo dl-gen a partir do data contract. Não edite à mão: altere o contrato e gere de novo.
+# Lido pelo ingestion-orchestrator (valores com {env} são resolvidos por --env).
+apiVersion: ingestion/v1
+kind: Ingestion
+contract:
+  id: 0f6c3e7d-8b9a-4c21-b3d4-5e6f7a8b9c0d
+  version: 1.0.0
+  status: draft
+dataset: cartoes
+table: cliente
+description: Cadastro de clientes portadores de cartão.
+source:
+  type: oracle
+  table: CRT.TB_CLIENTE
+  servers:
+    prd:
+      host: cartoes-prd.example.internal
+      port: 1521
+      database: CARTOESPRD
+      secretId: arn:aws:secretsmanager:sa-east-1:222222222222:secret:prd/cartoes/oracle
+load:
+  mode: incremental
+  incrementalColumns:
+  - DH_INCL_RGST
+  - DH_ATLZ_RGST
+  fetchSize: 150000
+  parallel:
+    days: 1
+    queries: 4
+    column: DH_INCL_RGST
+columns:
+- name: CD_CLIENTE
+  type: number
+  physicalType: NUMBER(18,0)
+  primaryKey: true
+  required: true
+- name: NU_CPF
+  type: string
+  physicalType: VARCHAR2(11)
+  encrypt: true
+- name: NM_CLIENTE
+  type: string
+  physicalType: VARCHAR2(200)
+- name: DH_INCL_RGST
+  type: timestamp
+  physicalType: DATE
+  required: true
+- name: DH_ATLZ_RGST
+  type: timestamp
+  physicalType: DATE
+target:
+  path: s3://datalake-{env}-raw/cartoes/cliente/
+  database: raw_cartoes
+  table: cliente
+  partitionColumn: dt_ingestao
+  format: json
+  compression: gzip
+encryption:
+  algorithm: AES/ECB
+  secretArn: arn:aws:secretsmanager:sa-east-1:222222222222:secret:prd/cartoes/chave-criptografia
+  secretField: AES_KEY
+  columns:
+  - NU_CPF
+quality:
+- check: notNull
+  columns:
+  - DH_ATLZ_RGST
+  severity: warning

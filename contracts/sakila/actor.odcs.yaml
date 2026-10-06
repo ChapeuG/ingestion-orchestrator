@@ -1,0 +1,111 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: 7c1f2a52-5d0b-4f7e-9a51-3f6f0d2b8a11
+name: sakila-actor
+version: 1.0.0
+status: draft
+domain: exemplos
+dataProduct: sakila
+
+description:
+  purpose: Cadastro de atores da base de exemplo Sakila, usado para validar o fluxo contrato → ingestão → transformação.
+  usage: Exemplo de referência. Não usar em produção.
+  limitations: Base pública de exemplo.
+
+tags: [ingestao, sakila, exemplo]
+
+team:
+  name: engenharia-de-dados
+  members:
+    - username: dono-exemplo
+      role: owner
+      dateIn: "2026-10-06"
+
+support:
+  - channel: engenharia-de-dados
+    tool: teams
+
+servers:
+  - server: sakila-dev
+    environment: dev
+    type: postgres
+    host: sakila-dev.example.internal
+    port: 5432
+    database: sakila
+    schema: public
+    customProperties:
+      - property: secretId
+        value: arn:aws:secretsmanager:sa-east-1:111111111111:secret:dev/sakila/postgres
+  - server: sakila-prd
+    environment: prd
+    type: postgres
+    host: sakila-prd.example.internal
+    port: 5432
+    database: sakila
+    schema: public
+    customProperties:
+      - property: secretId
+        value: arn:aws:secretsmanager:sa-east-1:222222222222:secret:prd/sakila/postgres
+
+schema:
+  - name: actor
+    physicalName: public.actor
+    physicalType: table
+    businessName: Atores
+    description: Cadastro de atores dos filmes da locadora.
+    dataGranularityDescription: Uma linha por ator
+    customProperties:
+      - property: loadMode
+        value: incremental
+      - property: rawPartitionColumn
+        value: dt_ingestao
+      - property: rawPath
+        value: s3://datalake-{env}-raw/sakila/actor/
+      - property: rawDatabase
+        value: raw_sakila
+    properties:
+      - name: actor_id
+        logicalType: integer
+        physicalType: integer
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        unique: true
+        description: Identificador do ator
+        classification: internal
+        quality:
+          - metric: duplicateValues
+            mustBe: 0
+            severity: error
+      - name: first_name
+        logicalType: string
+        physicalType: varchar(45)
+        required: true
+        description: Primeiro nome do ator
+        classification: internal
+      - name: last_name
+        logicalType: string
+        physicalType: varchar(45)
+        required: true
+        description: Sobrenome do ator
+        classification: internal
+      - name: last_update
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        partitioned: true
+        partitionKeyPosition: 1
+        description: Data e hora da última atualização do registro
+        classification: internal
+    quality:
+      - metric: rowCount
+        mustBeGreaterThan: 0
+        severity: warning
+        description: A carga não deve vir vazia
+
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+
+contractCreatedTs: "2026-10-06T00:00:00+00:00"
