@@ -21,14 +21,12 @@ O mesmo `dl-gen generate --contract` também gera o projeto de **transformação
 ## 1. Escrever o contrato
 
 ```bash
-python scripts/novo_contrato.py sakila actor --domain exemplos
+python scripts/novo_contrato.py <dataset> <tabela> --domain <area>
 ```
 
-Isso copia [`contracts/template.odcs.yaml`](contracts/template.odcs.yaml) para `contracts/sakila/actor.odcs.yaml`
-com id e datas preenchidos. O template explica cada campo e marca o que é obrigatório (`[OBRIGATÓRIO]`) e o que é
-extensão própria (`[EXT]`, sempre em `customProperties`). Há dois exemplos completos:
-[`sakila/actor`](contracts/sakila/actor.odcs.yaml) (Postgres) e
-[`cartoes/cliente`](contracts/cartoes/cliente.odcs.yaml) (Oracle, CPF criptografado, leitura paralela).
+Isso copia [`contracts/template.odcs.yaml`](contracts/template.odcs.yaml) para
+`contracts/<dataset>/<tabela>.odcs.yaml` com id e datas preenchidos. O template explica cada campo e marca o que é
+obrigatório (`[OBRIGATÓRIO]`) e o que é extensão própria (`[EXT]`, sempre em `customProperties`).
 
 ### Editor visual
 
@@ -37,16 +35,16 @@ modo visual, formulário guiado e YAML, com validação e preview. Como o contra
 prefira rodar o editor **localmente** (open source, MIT):
 
 ```bash
-npx datacontract-editor contracts/sakila/actor.odcs.yaml
+npx datacontract-editor contracts/<dataset>/<tabela>.odcs.yaml
 ```
 
-Alternativas: `docker run -p 4173:4173 datacontract/editor` ou `datacontract edit contracts/sakila/actor.odcs.yaml`.
+Alternativas: `docker run -p 4173:4173 datacontract/editor` ou `datacontract edit contracts/<dataset>/<tabela>.odcs.yaml`.
 
 ### Validar
 
 ```bash
 pip install datacontract-cli
-datacontract lint contracts/sakila/actor.odcs.yaml
+datacontract lint contracts/<dataset>/<tabela>.odcs.yaml
 ```
 
 O CI roda o lint em todo PR que mexe em `contracts/`.
@@ -76,31 +74,31 @@ Senha e chave **nunca** entram no contrato: só o ARN da secret.
 No framework ([`dl-gen`](https://github.com/ChapeuG/dl-gen), outro repositório):
 
 ```bash
-dl-gen generate --contract contracts/sakila/actor.odcs.yaml --publish-s3 s3://<bucket>/ingestion-config/
+dl-gen generate --contract contracts/<dataset>/<tabela>.odcs.yaml --publish-s3 s3://<bucket>/ingestion-config/
 ```
 
 Sem `--publish-s3` o arquivo fica em `ingestion-config/<dataset>/<tabela>.ingestion.yml`, para enviar depois com
-`aws s3 cp`. Exemplos gerados: [`examples/ingestion-config/`](examples/ingestion-config/).
+`aws s3 cp`.
 
 O yml é gerado, **não edite à mão**: altere o contrato e gere de novo. Se algo obrigatório faltar no contrato, o
 campo sai como `PREENCHER` e o orquestrador recusa a execução no ambiente que usa esse campo.
 
 ## 3. Executar
 
+O pacote `ingestion` é instalado no cluster com `pip` (bootstrap action do EMR, por exemplo), sem gerar zip:
+
 ```bash
-python scripts/package.py                                   # dist/ingestion.zip
-aws s3 cp dist/ingestion.zip s3://<bucket-artefatos>/ingestion-orchestrator/
-aws s3 cp jobs/main.py           s3://<bucket-artefatos>/ingestion-orchestrator/
+pip install "git+https://github.com/ChapeuG/ingestion-orchestrator@<versão>"
+aws s3 cp jobs/main.py s3://<bucket-artefatos>/ingestion-orchestrator/
 ```
 
 Step do EMR:
 
 ```bash
 spark-submit \
-  --py-files s3://<bucket-artefatos>/ingestion-orchestrator/ingestion.zip \
   --packages org.postgresql:postgresql:42.7.4,com.oracle.database.jdbc:ojdbc8:21.9.0.0 \
   s3://<bucket-artefatos>/ingestion-orchestrator/main.py \
-  --config s3://<bucket>/ingestion-config/sakila/actor.ingestion.yml \
+  --config s3://<bucket>/ingestion-config/<dataset>/<tabela>.ingestion.yml \
   --env prd \
   --raw-bucket s3://datalake-{env}-raw
 ```
@@ -144,7 +142,6 @@ aspas do alias) e registre em `CONNECTORS`.
 
 ```
 contracts/                  template.odcs.yaml + contratos por dataset
-examples/ingestion-config/  yml gerados pelo framework a partir dos exemplos
 jobs/main.py                entrypoint do spark-submit
 src/ingestion/
   config.py                 leitura e validação do ingestion.yml
@@ -155,7 +152,7 @@ src/ingestion/
   quality.py                notNull, unique, rowCount
   catalog.py                tabela externa JSON no Glue/Athena
   secrets.py, storage.py    Secrets Manager e leitura do S3
-scripts/                    novo_contrato.py, package.py
+scripts/                    novo_contrato.py
 ```
 
 ## Testes

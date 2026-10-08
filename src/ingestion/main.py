@@ -1,7 +1,7 @@
 """Ponto de entrada do orquestrador.
 
-    spark-submit --py-files ingestion.zip --packages <drivers> jobs/main.py \\
-        --config s3://<bucket>/ingestion-config/sakila/actor.ingestion.yml --env prd \\
+    spark-submit --packages <drivers> jobs/main.py \\
+        --config s3://<bucket>/ingestion-config/<dataset>/<tabela>.ingestion.yml --env prd \\
         --raw-bucket s3://datalake-{env}-raw
 
 --config aceita um arquivo ou um prefixo (todas as tabelas *.ingestion.yml abaixo dele).

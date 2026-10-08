@@ -1,4 +1,4 @@
-"""Entrypoint do spark-submit (o pacote ingestion vai no --py-files)."""
+"""Entrypoint do spark-submit (o pacote ingestion fica instalado no cluster via pip)."""
 
 import sys
 

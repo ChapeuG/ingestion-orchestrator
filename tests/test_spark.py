@@ -8,9 +8,9 @@ from __future__ import annotations
 import base64
 import os
 import sys
-from pathlib import Path
 
 import pytest
+from configs import ACTOR, CLIENTE
 
 pyspark = pytest.importorskip("pyspark")
 
@@ -23,7 +23,6 @@ from ingestion.crypto import encrypt_columns  # noqa: E402
 from ingestion.quality import QualityError, run_checks  # noqa: E402
 
 KEY = base64.b64encode(b"0123456789abcdef").decode()  # AES-128 de teste
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "ingestion-config"
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +66,7 @@ def test_quality_error_and_warning(spark):
 
 
 def test_create_table_sql(spark):
-    cfg = parse_config((EXAMPLES / "sakila" / "actor.ingestion.yml").read_text(encoding="utf-8"), "prd",
+    cfg = parse_config(ACTOR, "prd",
                        raw_bucket="s3://datalake-{env}-raw")
     schema = spark.createDataFrame([], "actor_id int, first_name string, last_update timestamp, `@version` string").schema
     sql = create_table_sql(cfg, schema)
@@ -85,7 +84,7 @@ def test_run_table_end_to_end(spark, tmp_path, monkeypatch):
 
     from ingestion import pipeline
 
-    data = yaml.safe_load((EXAMPLES / "cartoes" / "cliente.ingestion.yml").read_text(encoding="utf-8"))
+    data = yaml.safe_load(CLIENTE)
     cfg = parse_config(yaml.safe_dump(data), "prd", raw_bucket=(tmp_path / "raw").as_uri())
 
     source = spark.sql(

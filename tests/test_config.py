@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 
 import pytest
 import yaml
+from configs import ACTOR, CLIENTE
 
 from ingestion import dates
 from ingestion.config import ConfigError, QualityRule, parse_config
 from ingestion.connectors import CONNECTORS, get_connector
 from ingestion.main import load_configs
 from ingestion.quality import evaluate
-
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "ingestion-config"
-ACTOR = (EXAMPLES / "sakila" / "actor.ingestion.yml").read_text(encoding="utf-8")
-CLIENTE = (EXAMPLES / "cartoes" / "cliente.ingestion.yml").read_text(encoding="utf-8")
 
 
 def _edit(text: str, fn) -> str:
@@ -27,7 +23,7 @@ def _edit(text: str, fn) -> str:
 
 # ── Configuração ───────────────────────────────────────────────────────
 
-def test_examples_are_valid():
+def test_generated_configs_are_valid():
     actor = parse_config(ACTOR, "prd", raw_bucket="s3://datalake-{env}-raw")
     assert actor.key == "sakila.actor"
     assert actor.source_type == "postgres"
@@ -81,12 +77,15 @@ def test_invalid_configs():
         parse_config(_edit(CLIENTE, lambda d: d.pop("encryption")), "prd")
 
 
-def test_load_configs_from_folder_and_filter():
-    assert {c.key for c in load_configs(str(EXAMPLES), "prd")} == {"sakila.actor", "cartoes.cliente"}
-    assert [c.key for c in load_configs(str(EXAMPLES), "prd", tables="actor")] == ["sakila.actor"]
+def test_load_configs_from_folder_and_filter(tmp_path):
+    for dataset, table, text in (("sakila", "actor", ACTOR), ("cartoes", "cliente", CLIENTE)):
+        (tmp_path / dataset).mkdir()
+        (tmp_path / dataset / f"{table}.ingestion.yml").write_text(text, encoding="utf-8")
+    assert {c.key for c in load_configs(str(tmp_path), "prd")} == {"sakila.actor", "cartoes.cliente"}
+    assert [c.key for c in load_configs(str(tmp_path), "prd", tables="actor")] == ["sakila.actor"]
     # actor tem dev, cliente não: a pasta inteira falha antes de começar qualquer carga
     with pytest.raises(ConfigError, match="cliente"):
-        load_configs(str(EXAMPLES), "dev")
+        load_configs(str(tmp_path), "dev")
 
 
 # ── Conectores ─────────────────────────────────────────────────────────
