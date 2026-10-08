@@ -55,6 +55,10 @@ class MySqlConnector(Connector):
         # Sem ANSI_QUOTES o MySQL não aceita aspas duplas em identificador
         return f"`{alias}`"
 
+    def extra_properties(self):
+        # YEAR: por padrão o Connector/J devolve como data (2010-01-01); assim vem o ano como número
+        return {"yearIsDateType": "false"}
+
 
 class SqlServerConnector(Connector):
     name = "sqlserver"

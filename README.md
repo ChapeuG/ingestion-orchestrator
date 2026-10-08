@@ -66,6 +66,7 @@ O CI roda o lint em todo PR que mexe em `contracts/`.
 | `customProperties.rawDatabase` | Database no Glue/Athena (default `raw_<dataset>`) |
 | — | Destino na raw: sempre `<--raw-bucket>/<dataset>/<tabela>/` |
 | `primaryKey`, `stagingName`, `description` | Usados pelo framework na transformação (merge Delta, nomenclatura, comments) |
+| `properties[].relationships` (`foreignKey`, `to: tabela.coluna`) | Relação entre tabelas: validada e documentada pelo framework; a ingestão lê cada tabela separadamente |
 
 Senha e chave **nunca** entram no contrato: só o ARN da secret.
 

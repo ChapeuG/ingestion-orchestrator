@@ -174,3 +174,11 @@ def test_quality_evaluate():
     assert evaluate(QualityRule("rowCount", bounds={"mustBeGreaterThan": 0}), METRICS).passed
     res = evaluate(QualityRule("rowCount", bounds={"mustBeGreaterThan": 0, "mustBeLessThan": 5}), METRICS)
     assert not res.passed and "< 5" in res.detail
+
+
+def test_mysql_reads_year_as_number():
+    # YEAR do MySQL: sem isso o Connector/J devolve data (2010-01-01) em vez do ano
+    from ingestion.config import Server
+    opts = get_connector("mysql").jdbc_options(Server("localhost", "3306", "filmes", "arn"), {"username": "u"})
+    assert opts["url"] == "jdbc:mysql://localhost:3306/filmes"
+    assert opts["yearIsDateType"] == "false"
