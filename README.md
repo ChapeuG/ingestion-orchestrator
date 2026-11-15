@@ -1,5 +1,7 @@
 # ingestion-orchestrator
 
+> **Arquivado.** Este projeto agora faz parte do **[datapacto](https://github.com/ChapeuG/datapacto)**, em [`packages/orchestrator`](https://github.com/ChapeuG/datapacto/tree/main/packages/orchestrator), com todo o histórico preservado.
+
 Motor de ingestão **PySpark** guiado por **data contract**. Um projeto só ingere qualquer tabela de qualquer origem
 JDBC (Oracle, Postgres, MySQL, SQL Server) para a raw do Data Lake: basta o contrato da tabela.
 
